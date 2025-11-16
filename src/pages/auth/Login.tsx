@@ -18,30 +18,46 @@ export default function Login() {
     setLoading(true);
 
     try {
+      console.log('Tentando login com:', email);
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password: senha,
       });
 
+      console.log('Resposta do servidor:', { data, error });
+
       if (error) {
-        toast.error('E-mail ou senha incorreta e ou não cadastrado');
+        // Diferenciar tipos de erro
+        if (error.status === 500) {
+          toast.error('Problema temporário no servidor. Tente novamente em instantes.');
+          console.error('Erro 500 do servidor:', error);
+        } else {
+          toast.error('E-mail ou senha incorretos');
+          console.error('Erro de autenticação:', error);
+        }
         return;
       }
 
       // Check if temporary password
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('senha_temporaria')
         .eq('id', data.user.id)
         .single();
 
+      console.log('Perfil encontrado:', profile, profileError);
+
       if (profile?.senha_temporaria) {
+        console.log('Senha temporária detectada, redirecionando para reset');
         navigate('/auth/reset-password');
       } else {
+        console.log('Login bem-sucedido, redirecionando para dashboard');
         navigate('/dashboard');
       }
     } catch (error) {
-      toast.error('Erro ao fazer login');
+      console.error('Exceção no login:', error);
+      toast.error('Erro inesperado ao fazer login');
     } finally {
       setLoading(false);
     }

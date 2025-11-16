@@ -56,7 +56,7 @@ export default function Users() {
       return;
     }
 
-    const tempPassword = 'Temp@123';
+    const tempPassword = 'Ab102030@';
 
     try {
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
