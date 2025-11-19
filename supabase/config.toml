@@ -1,1 +1,4 @@
 project_id = "ftfzoqelcmybnpjykizq"
+
+[functions.seed-master-admin]
+verify_jwt = false
