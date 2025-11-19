@@ -312,6 +312,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_order_alert_color: {
+        Args: { data_criacao: string; prazo_entrega_dias: number }
+        Returns: Database["public"]["Enums"]["alert_color"]
+      }
       generate_order_number: { Args: never; Returns: string }
       generate_product_code: { Args: never; Returns: string }
     }
@@ -325,6 +329,7 @@ export type Database = {
         | "devolvido"
         | "cancelado"
       user_access_type: "admin" | "common"
+      user_access_type_new: "admin" | "comum"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -462,6 +467,7 @@ export const Constants = {
         "cancelado",
       ],
       user_access_type: ["admin", "common"],
+      user_access_type_new: ["admin", "comum"],
     },
   },
 } as const
