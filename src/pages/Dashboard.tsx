@@ -14,11 +14,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { StockChart } from '@/components/StockChart';
+import { ProductSearch } from '@/components/ProductSearch';
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const [profile, setProfile] = useState<any>(null);
   const [showExitDialog, setShowExitDialog] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -68,13 +71,8 @@ export default function Dashboard() {
           <div className="bg-primary rounded-lg p-8 space-y-6">
             {isAdmin ? (
               <div className="space-y-4">
-                <h2 className="text-xl font-semibold text-primary-foreground">
-                  Busque seu item para uma melhor análise
-                </h2>
-                {/* Placeholder for charts */}
-                <div className="bg-card rounded-lg p-6 text-center min-h-[300px] flex items-center justify-center">
-                  <p className="text-muted-foreground">Histórico de Entrada e Saída</p>
-                </div>
+                <ProductSearch onSelectProduct={setSelectedProduct} />
+                <StockChart produtoId={selectedProduct || undefined} />
               </div>
             ) : (
               <div className="flex items-center justify-center min-h-[400px]">

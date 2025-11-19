@@ -16,80 +16,115 @@ serve(async (_req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-    // Master admin credentials (idempotent seeding)
-    const email = "ramonmatos390@gmail.com";
-    const password = "M@415263s";
+    // SEED: Admin Master e Usuário Comum conforme documento
+    const users = [
+      {
+        email: "ramonmatos390@gmail.com",
+        password: "M@415263s",
+        nome: "Master Admin",
+        tipo_acesso: "admin",
+        permissoes: {
+          gerenciar_usuarios: "total",
+          visualizar_estoque: true,
+          visualizar_alertas: true,
+          visualizar_cadastro: true,
+          visualizar_terminal: true,
+          visualizar_pedidos: true,
+          editar_valores: true,
+          editar_alertas: true,
+          editar_estoque: true,
+          editar_pedidos: true,
+          gerenciar_admin: true,
+        },
+      },
+      {
+        email: "comum@teste.com",
+        password: "Temp100@",
+        nome: "Usuário Comum",
+        tipo_acesso: "comum",
+        permissoes: {
+          gerenciar_usuarios: "visualizar",
+          visualizar_estoque: true,
+          visualizar_alertas: false,
+          visualizar_cadastro: false,
+          visualizar_terminal: true,
+          visualizar_pedidos: false,
+          editar_valores: false,
+          editar_alertas: false,
+          editar_estoque: false,
+          editar_pedidos: false,
+          gerenciar_admin: false,
+        },
+      },
+    ];
 
-    let userId: string | undefined;
-    let created = false;
+    const results = [];
 
-    // Try to find by profile first (fast path)
-    const { data: existingProf, error: profErr } = await admin
-      .from("profiles")
-      .select("id")
-      .eq("email", email)
-      .limit(1);
+    for (const userData of users) {
+      let userId: string | undefined;
+      let created = false;
 
-    if (profErr) throw profErr;
+      // Verificar se o perfil já existe
+      const { data: existingProf, error: profErr } = await admin
+        .from("profiles")
+        .select("id")
+        .eq("email", userData.email)
+        .limit(1);
 
-    if (existingProf && existingProf.length > 0) {
-      userId = existingProf[0].id as any;
-    } else {
-      // Create auth user (idempotent - if exists, we'll fetch it)
-      const { data: createdUser, error: createErr } = await admin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { nome: "Master Admin" },
-      });
+      if (profErr) throw profErr;
 
-      if (createErr) {
-        // If already exists, resolve id by listing users
-        const { data: list, error: listErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
-        if (listErr) throw listErr;
-        const found = list?.users?.find((u: any) => u.email === email);
-        if (!found) throw createErr;
-        userId = found.id;
+      if (existingProf && existingProf.length > 0) {
+        userId = existingProf[0].id as any;
       } else {
-        userId = createdUser.user?.id;
-        created = true;
+        // Criar usuário de autenticação
+        const { data: createdUser, error: createErr } = await admin.auth.admin.createUser({
+          email: userData.email,
+          password: userData.password,
+          email_confirm: true,
+          user_metadata: { nome: userData.nome },
+        });
+
+        if (createErr) {
+          // Se já existe, buscar o usuário
+          const { data: list, error: listErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+          if (listErr) throw listErr;
+          const found = list?.users?.find((u: any) => u.email === userData.email);
+          if (!found) throw createErr;
+          userId = found.id;
+        } else {
+          userId = createdUser.user?.id;
+          created = true;
+        }
       }
+
+      if (!userId) throw new Error(`Could not resolve user id for ${userData.email}`);
+
+      // Upsert perfil completo
+      const { error: upsertErr } = await admin
+        .from("profiles")
+        .upsert(
+          {
+            id: userId,
+            nome: userData.nome,
+            email: userData.email,
+            senha_temporaria: userData.email === "comum@teste.com", // Apenas comum tem senha temporária
+            tipo_acesso: userData.tipo_acesso,
+            permissoes: userData.permissoes,
+          },
+          { onConflict: "id" }
+        );
+
+      if (upsertErr) throw upsertErr;
+
+      results.push({
+        email: userData.email,
+        created,
+        userId,
+      });
     }
 
-    if (!userId) throw new Error("Could not resolve master admin user id");
-
-    // Upsert full-permission profile for dashboard logic already in app
-    const permissoes = {
-      visualizar_estoque: true,
-      visualizar_alertas: true,
-      visualizar_cadastro: true,
-      visualizar_terminal: true,
-      visualizar_pedidos: true,
-      editar_valores: true,
-      editar_alertas: true,
-      editar_estoque: true,
-      editar_pedidos: true,
-      gerenciar_admin: true,
-    } as any;
-
-    const { error: upsertErr } = await admin
-      .from("profiles")
-      .upsert(
-        {
-          id: userId,
-          nome: "Master Admin",
-          email,
-          senha_temporaria: false,
-          tipo_acesso: "admin",
-          permissoes,
-        },
-        { onConflict: "id" }
-      );
-
-    if (upsertErr) throw upsertErr;
-
     return new Response(
-      JSON.stringify({ ok: true, created, userId }),
+      JSON.stringify({ ok: true, users: results }),
       { headers: { "content-type": "application/json" } }
     );
   } catch (e) {
